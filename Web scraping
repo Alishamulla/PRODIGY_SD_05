@@ -1,0 +1,64 @@
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
+
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.io.IOException;
+
+public class WebScraperCSV {
+
+    private static final String BASE_URL = "https://quotes.toscrape.com";
+    private static final String OUTPUT_FILE = "quotes.csv";
+
+    public static void main(String[] args) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(OUTPUT_FILE))) {
+            // Write CSV header
+            writer.println("Quote,Author,Tags");
+
+            String url = BASE_URL;
+            while (url != null) {
+                System.out.println("Scraping: " + url);
+
+                // Fetch page
+                Document doc = Jsoup.connect(url).get();
+
+                // Extract quotes
+                Elements quotes = doc.select("div.quote");
+                for (Element quote : quotes) {
+                    String text = quote.select("span.text").text();
+                    String author = quote.select("small.author").text();
+
+                    // Collect tags as comma-separated
+                    Elements tagElements = quote.select(".tags .tag");
+                    StringBuilder tags = new StringBuilder();
+                    for (Element tag : tagElements) {
+                        if (tags.length() > 0) tags.append("|"); // separator
+                        tags.append(tag.text());
+                    }
+
+                    // Escape quotes for CSV
+                    String safeText = text.replace("\"", "\"\"");
+                    String safeAuthor = author.replace("\"", "\"\"");
+
+                    // Write to CSV
+                    writer.printf("\"%s\",\"%s\",\"%s\"%n", safeText, safeAuthor, tags.toString());
+                }
+
+                // Check for next page
+                Element nextPage = doc.select("li.next > a").first();
+                if (nextPage != null) {
+                    url = BASE_URL + nextPage.attr("href");
+                } else {
+                    url = null; // No more pages
+                }
+            }
+
+            System.out.println("✅ Scraping complete! Data saved to " + OUTPUT_FILE);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
